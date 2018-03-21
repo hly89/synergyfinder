@@ -37,8 +37,10 @@ PlotDoseResponse <- function (data, save.file = FALSE, pair.index = NULL, Emin =
     data.plot <- data.frame(x = numeric(num.row), y = numeric(num.row),
                             Inhibition = numeric(num.row))
     data.plot$Inhibition <- round(c(response.mat), 2)
-    data.plot$y <- rep(c(1:ncol(response.mat)), nrow(response.mat))
-    data.plot$x <- rep(1:nrow(response.mat), each = ncol(response.mat))
+    data.plot$y <- rep(c(1:nrow(response.mat)), ncol(response.mat))
+	#data.plot$y <- rep(c(1:ncol(response.mat)), nrow(response.mat))
+    #data.plot$x <- rep(1:nrow(response.mat), each = ncol(response.mat))
+	data.plot$x <- rep(1:ncol(response.mat), each = nrow(response.mat))
     data.plot$x <- as.factor(data.plot$x)
     data.plot$y <- as.factor(data.plot$y)
     conc.runit <- drug.pairs$concRUnit[i] ## concentration row unit

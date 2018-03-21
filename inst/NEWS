@@ -1,3 +1,9 @@
+# synergyfinder 1.4.3
+
+## New features
+
+* fix bugs in PlotDoseResponse for non-square matrix
+
 # synergyfinder 1.4.2
 
 ## New features
