@@ -1,3 +1,11 @@
+# synergyfinder 1.6.1
+
+## New features
+
+* fix bugs in PlotDoseResponse for non-square matrix
+
+* allow to separate concentration units for each drug
+
 # synergyfinder 1.5.1
 
 ## New features
