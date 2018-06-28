@@ -193,7 +193,7 @@ PlotSynergy <- function(data, type = "2D", save.file = FALSE, len = 3, pair.inde
       plot.new()
       plot.window(ylim = c(0, 1), xlim = range(levels), xaxs = "i", yaxs = "i")
       rect(levels[-length(levels)],0, levels[-1L],0.3, col = col, border = NA)
-      axis(3,tick = FALSE, at = do.breaks(c(start.point, end.point), end.point/10))
+      axis(3,tick = FALSE, at = round(do.breaks(c(start.point, end.point), end.point/10),0))
       title(plot.title)
       par(mar = c(5.1,4.1,1.1,2.1))
       suppressWarnings(par(mgp = c(2,1,0)))
