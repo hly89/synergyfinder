@@ -95,11 +95,12 @@ PlotSynergy <- function(data, type = "2D", save.file = FALSE, len = 3, pair.inde
     mat.tmp <- scores.extended
     if(!is.null(col.range)){
       # selecting cols
-      mat.tmp[, which(pred.cory >= col.range[1] & pred.cory <= col.range[2])]
+      
+      mat.tmp[, which(colnames(mat.tmp) >= col.range[1] & colnames(mat.tmp) <= col.range[2])]
     }
     if(!is.null(row.range)){
       # selecting rows
-      mat.tmp[which(pred.corx >= row.range[1] & pred.corx <= row.range[2]), ]
+      mat.tmp[which(rownames(mat.tmp) >= row.range[1] & rownames(mat.tmp) <= row.range[2]), ]
     }
     
     # the matrix for plotting
@@ -343,7 +344,9 @@ PlotSynergy <- function(data, type = "2D", save.file = FALSE, len = 3, pair.inde
   extended.scores <- matrix(extended.scores, 
                             nrow = length(extended.row.idx),
                             ncol = length(extended.col.idx),
-                            byrow = TRUE)	
+                            byrow = TRUE)
+  rownames(extended.scores) <- extended.row.idx
+  colnames(extended.scores) <- extended.col.idx
   extended.scores
 }
 
