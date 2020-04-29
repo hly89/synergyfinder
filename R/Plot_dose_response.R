@@ -55,7 +55,7 @@ PlotDoseResponse <- function (data, save.file = FALSE, pair.index = NULL, Emin =
     axis.x.text <- round(as.numeric(colnames(response.mat)), 1)
     axis.y.text <- round(as.numeric(rownames(response.mat)), 1)
     dose.response.p <- ggplot(data.plot, aes_string(x = "x", y = "y")) + geom_tile(aes_string(fill = 'Inhibition')) +
-      geom_text(aes_string(fill = 'Inhibition', label = 'Inhibition')) +
+      geom_text(aes_string(label = 'Inhibition')) +
       scale_fill_gradient2(low = "green", high = "red", midpoint = 0, name = "Inhibition (%)") +
       scale_x_discrete(labels = axis.x.text) + scale_y_discrete(labels = axis.y.text) +
       xlab(paste(drug.col, cunit.text, sep = " ")) + ylab(paste(drug.row, runit.text, sep = " "))
