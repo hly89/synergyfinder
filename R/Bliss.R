@@ -25,19 +25,22 @@ Bliss <- function(response.mat, correction = TRUE, Emin = NA, Emax = NA, nan.han
     # correct the response data
     response.mat <- BaselineCorrectionSD(response.mat, Emin = Emin, Emax = Emax, nan.handle)$corrected.mat
   }
-
-
-  drug1.response <- response.mat[, 1]
-  drug2.response <- response.mat[1, ]
   # reference matrix
-  ref.mat <- response.mat
-  for (i in 2:nrow(response.mat)) {
-    for (j in 2:ncol(response.mat)) {
-      ref.mat[i, j] <- drug1.response[i] + drug2.response[j] -
-                              drug1.response[i] * drug2.response[j]/100
-    }
-  }
+  ref.mat <- Bliss_mat(response.mat)
   # synergy matrix
   syn.mat <- response.mat - ref.mat
   syn.mat
+}
+
+Bliss_mat <- function(response.mat){
+  ref.mat <- response.mat
+  drug1.response <- response.mat[, 1]
+  drug2.response <- response.mat[1, ]
+  for (i in 2:nrow(response.mat)) {
+    for (j in 2:ncol(response.mat)) {
+      ref.mat[i, j] <- drug1.response[i] + drug2.response[j] -
+        drug1.response[i] * drug2.response[j]/100
+    }
+  }
+  ref.mat
 }
