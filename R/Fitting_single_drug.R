@@ -22,7 +22,7 @@ FittingSingleDrug <- function(response.mat, fixed = c(NA, NA, NA, NA), nan.handl
   drug.col <- cbind(as.numeric(colnames(response.mat)[-1]), response.mat[1, 2:c.num])
   colnames(drug.col) <- c("conc","effect")
   drug.col <- as.data.frame(apply(drug.col, 2, as.numeric))
-  if (var(drug.col$effect) == 0) {
+  if (var(drug.col$effect, na.rm = T) == 0) {
     drug.col$effect[nrow(drug.col)] <- drug.col$effect[nrow(drug.col)] + 10^-10
   }
   
@@ -54,7 +54,7 @@ FittingSingleDrug <- function(response.mat, fixed = c(NA, NA, NA, NA), nan.handl
   drug.row <- cbind(as.numeric(rownames(response.mat)[-1]), response.mat[2:r.num, 1])
   colnames(drug.row) <- c("conc","effect")
   drug.row <- as.data.frame(apply(drug.row, 2, as.numeric))
-  if (var(drug.row$effect) == 0) {
+  if (var(drug.row$effect, na.rm = T) == 0) {
     drug.row$effect[nrow(drug.row)] <- drug.row$effect[nrow(drug.row)] + 10^-10
   }
   drug.row.model <- tryCatch({
