@@ -20,12 +20,16 @@
 #' data("mathews_screening_data")
 #' data <- ReshapeData(mathews_screening_data)
 #' delta.score <- Loewe(data$dose.response.mats[[1]])
-Loewe <- function(response.mat, correction = TRUE, Emin = NA, Emax = NA, nan.handle = c("LL4", "L4")) {
+Loewe <- function(response.mat, correction = TRUE, Emin = NA, Emax = NA, nan.handle = c("LL4", "L4")) {#
   if(correction) {
     # correct the response data
     response.mat <- BaselineCorrectionSD(response.mat, Emin = Emin, Emax = Emax, nan.handle)$corrected.mat
-  }
+  }  
+  loewe.mat <- Loewe_mat(response.mat)
+  return(response.mat - loewe.mat)
+}
 
+Loewe_mat <- function(response.mat){
   single.fit <- FittingSingleDrug(response.mat)
   # column drug
   drug.col.model <- single.fit$drug.col.model
@@ -35,7 +39,7 @@ Loewe <- function(response.mat, correction = TRUE, Emin = NA, Emax = NA, nan.han
        (conc / drug.col.par[4]) ^ drug.col.par[1]) /
       (1 + (conc / drug.col.par[4]) ^ drug.col.par[1])
   }
-
+  
   # row drug
   drug.row.model <- single.fit$drug.row.model
   drug.row.par <- coef(drug.row.model)
@@ -62,8 +66,9 @@ Loewe <- function(response.mat, correction = TRUE, Emin = NA, Emax = NA, nan.han
         y.loewe2 <- d2.fun(x1 + x2, drug.row.par)
         loewe.mat[j + 1, i + 1] <- ifelse(y.loewe1 > y.loewe2, y.loewe1, y.loewe2)
       }
-
+      
     }
   }
-  return(response.mat - loewe.mat)
+  
+  loewe.mat
 }

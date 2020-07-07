@@ -24,7 +24,8 @@ ZIP <- function(response.mat, correction = TRUE, Emin = 0, Emax = 100, nan.handl
     nan.handle <- match.arg(nan.handle)
     response.mat <- BaselineCorrectionSD(response.mat, NA, NA, nan.handle)$corrected.mat
   }
-  # Fitting single drugs using logistic functions
+  
+  # Fitting single drugs using logistic functions - NB Repeated code below
   # NA values treated
   single.fitted <- FittingSingleDrug(response.mat, fixed = c(NA, Emin, Emax, NA), nan.handle)
   drug.col.response <- single.fitted$drug.col.fitted
@@ -35,7 +36,7 @@ ZIP <- function(response.mat, correction = TRUE, Emin = 0, Emax = 100, nan.handl
   rownames(updated.single.mat) <- rownames(response.mat)
   updated.single.mat[1, c(2:ncol(response.mat))] <- drug.col.response
   updated.single.mat[c(2:nrow(response.mat)), 1] <- drug.row.response
-
+  
   # Update the column2-column8
   updated.col.mat <- updated.single.mat
   for (i in 2:ncol(response.mat)){
@@ -73,6 +74,31 @@ ZIP <- function(response.mat, correction = TRUE, Emin = 0, Emax = 100, nan.handl
   # take average of updated.col.mat and updated.row.mat as fitted.mat
   fitted.mat <- (updated.col.mat + updated.row.mat) / 2
 
+  # negative and positive controls are removed
+  fitted.mat[1, 1] <- 0
+  # cannot be over 100 for the estimation
+  fitted.mat <- apply(fitted.mat, c(1, 2), function(x) ifelse(x > 100, 100, x))
+  
+  zip.mat <- ZIP_mat(response.mat, Emin, Emax, nan.handle)
+  
+  delta.mat <- (fitted.mat - zip.mat)
+  delta.mat
+}
+
+ZIP_mat <- function(response.mat, Emin = 0, Emax = 100, nan.handle = c("LL4", "L4")){
+
+  # Fitting single drugs using logistic functions - NB repeated code above
+  # NA values treated
+  single.fitted <- FittingSingleDrug(response.mat, fixed = c(NA, Emin, Emax, NA), nan.handle)
+  drug.col.response <- single.fitted$drug.col.fitted
+  drug.row.response <- single.fitted$drug.row.fitted
+  # Update the first row and first column
+  updated.single.mat <- mat.or.vec(nrow(response.mat),ncol(response.mat))
+  colnames(updated.single.mat) <- colnames(response.mat)
+  rownames(updated.single.mat) <- rownames(response.mat)
+  updated.single.mat[1, c(2:ncol(response.mat))] <- drug.col.response
+  updated.single.mat[c(2:nrow(response.mat)), 1] <- drug.row.response
+
   # make zip.mat based on updated.single.mat
   zip.mat <- updated.single.mat
   for (i in 2:nrow(updated.single.mat)){
@@ -80,11 +106,9 @@ ZIP <- function(response.mat, correction = TRUE, Emin = 0, Emax = 100, nan.handl
       zip.mat[i,j] <- updated.single.mat[i, 1] + updated.single.mat[1, j] - updated.single.mat[i, 1] * updated.single.mat[1, j] / 100
     }
   }
+  
   # negative and positive controls are removed
-  fitted.mat[1, 1] <- 0
   zip.mat[1, 1] <- 0
-  # cannot be over 100 for the estimation
-  fitted.mat <- apply(fitted.mat, c(1, 2), function(x) ifelse(x > 100, 100, x))
-  delta.mat <- (fitted.mat - zip.mat)
-  delta.mat
+  
+  zip.mat
 }

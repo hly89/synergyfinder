@@ -24,17 +24,22 @@ HSA <- function(response.mat, correction = TRUE, Emin = NA, Emax = NA, nan.handl
     # correct the response data
     response.mat <- BaselineCorrectionSD(response.mat, Emin = Emin, Emax = Emax, nan.handle)$corrected.mat
   }
+  # reference matrix
+  ref.mat <- HSA_mat(response.mat)
+  # synergy matrix
+  syn.mat <- response.mat - ref.mat
+  syn.mat
+}
+
+HSA_mat <- function(response.mat){
+  ref.mat <- response.mat
   drug1.response <- response.mat[, 1]
   drug2.response <- response.mat[1, ]
-  # reference matrix
-  ref.mat <- response.mat
   for (i in 2:nrow(response.mat)) {
     for (j in 2:ncol(response.mat)) {
       ref.mat[i, j] <- ifelse(drug1.response[i] > drug2.response[j],
                               drug1.response[i], drug2.response[j])
     }
   }
-  # synergy matrix
-  syn.mat <- response.mat - ref.mat
-  syn.mat
+  ref.mat
 }
