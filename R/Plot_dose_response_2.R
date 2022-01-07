@@ -35,7 +35,7 @@ PlotDoseResponse2 <- function (data, pair.index = NULL, Emin = NA,
         num.row <- length(response.mat)
         data.plot <- data.frame(x = numeric(num.row), y = numeric(num.row), 
             Inhibition = numeric(num.row))
-        data.plot$Inhibition <- round(c(response.mat), 2)
+        data.plot$Inhibition <- round(c(response.mat), 1)    # decimal places inside heatmaps
         data.plot$y <- rep(c(1:nrow(response.mat)), ncol(response.mat))
         data.plot$x <- rep(1:ncol(response.mat), each = nrow(response.mat))
         data.plot$x <- as.factor(data.plot$x)
@@ -50,12 +50,12 @@ PlotDoseResponse2 <- function (data, pair.index = NULL, Emin = NA,
 #            "\n BlockID:", drug.pairs$blockIDs[i], sep = " ")
         plot.title <- ""
         axis.x.text <- round(as.numeric(colnames(response.mat)), 
-            1)
+            2)      # heatmap axis labels decimal places
         axis.y.text <- round(as.numeric(rownames(response.mat)), 
-            1)
+            2)
         dose.response.p <- ggplot(data.plot, aes_string(x = "x", 
             y = "y")) + geom_tile(aes_string(fill = "Inhibition")) + 
-            geom_text(aes_string(label = "Inhibition")) + 
+            geom_text(aes_string(label = "Inhibition"), size = 2) +    # heatmap text size
             scale_fill_gradient2(low = "green", high = "red", 
                 midpoint = 0, name = "Inhib. (%)") + scale_x_discrete(labels = axis.x.text) + 
             scale_y_discrete(labels = axis.y.text) + xlab(paste(drug.col, 
@@ -69,7 +69,7 @@ PlotDoseResponse2 <- function (data, pair.index = NULL, Emin = NA,
         dose.response.p <- dose.response.p + ggtitle(plot.title) + 
             theme(plot.title = element_text(size = 20))
         single.fitted <- FittingSingleDrug(response.mat, fixed = c(NA, 
-            Emin, Emax, NA))
+            Emin, Emax, NA), nan.handle = "L4")
 #        layout(matrix(c(1, 3, 2, 3), 2, 2, byrow = TRUE))
         layout(matrix(c(1, 3, 2, 3), 2, 2, byrow = TRUE), widths = c(1, 3))
  #       suppressWarnings(par(mgp = c(3, 0.5, 0)))
