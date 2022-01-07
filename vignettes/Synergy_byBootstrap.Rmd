@@ -1,0 +1,333 @@
+---
+title: "Sample Script - Synergy Bootstrapped"
+author: "P R Barber"
+date: "07/01/2022"
+geometry: "left=2cm,right=2cm,top=2cm,bottom=2cm"
+output: pdf_document
+---
+
+Version history:
+
+Bayesian Bootstrap from the replicates to get better error bars.
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(pzfx)
+library(stringr)
+library(ggplot2)
+library(bayesboot) 
+
+# Uses my Github fork of the synergyfinder package, for PlotDoseResponse2() etc.
+# Install using these commands
+#library(devtools)
+#install("synergyfinder")
+
+# Not sure if this requires BiocManager, these are the commands to install the stock synergyfinder
+#if (!requireNamespace("BiocManager", quietly = TRUE))
+#    install.packages("BiocManager")
+#BiocManager::install(version = "3.11")
+#BiocManager::install("synergyfinder")
+
+library(synergyfinder)
+
+
+# Use an image of all the data to jump into script at any point since some blocks take a long time.
+dataimagefilename = "MultiDrugSynergy_BayesBootstrapped.Rdata"
+
+#load(dataimagefilename)
+
+methods <- c("ZIP")    # "ZIP", "Bliss", "HSA" and "Loewe"
+
+#### Can EDIT THIS for more repeats, usually 1000 ####
+# Bootstraps
+nRepeats = 100
+```
+
+Number of bootstrap repeats: `r nRepeats`
+
+```{r CalculateSynergySummaryScore, echo=F, warning=F, message=F, eval=T}
+
+#load(dataimagefilename)
+
+CalculateSynergySummaryScore <- function(data, method = "ZIP", plot = FALSE){
+  
+    synergy.score <- NULL  # default value to check if try succeeded
+
+    # Specify L.4 model (general asymmetric five-parameter log-logistic function), 
+    # if the usual LL.4 (four-parameter log-logistic function) model produces nan
+    try(synergy.score <- CalculateSynergy(data = data, method = method, 
+                                          nan.handle = "L4"))  
+      
+    # Check scores
+    if(any(is.nan(synergy.score$scores[[1]]))){
+      synergy.score <- NULL  # values no good
+    }
+      
+    if(!is.null(synergy.score)) {
+      # Get summary score from matrix of scores
+      scores.tmp <- synergy.score$scores[[1]]
+      scores.tmp <- scores.tmp[, -1]
+      scores.tmp <- scores.tmp[-1, ]
+      summary.score <- round(mean(scores.tmp, na.rm = TRUE), 3)
+      
+      if(plot)
+        PlotSynergy2(synergy.score, type = "all") 
+
+    } else {
+      summary.score <- NA
+    }
+
+  return(summary.score)
+}
+
+replaceNaNsinResponse <- function(Response){
+    # Replace any NaN with average of those either side, NB assumes 6x6 matrix
+    if(any(is.nan(Response))){
+      for(j in which(is.nan(Response))){
+        i <- pmax(j-1, 1)
+        k <- pmin(j+1, length(Response))
+      
+        if(j %in% rowBorders){   # at start of row
+          Response[j] <- Response[k]
+        } else if (j %in% (rowBorders + numberOfCols - 1)){  # at end of row
+          Response[j] <- Response[i]
+        } else {
+          Response[j] <- (Response[i] + Response[k]) / 2
+        }
+      }
+    }
+  
+  return(Response)
+}
+
+#save.image(file = dataimagefilename)
+
+```
+
+# Load data
+
+```{r}
+
+#### EDIT THIS ####
+# Create a vector of csv file names to process
+all_tables <- c("../data/data_with_replicates")
+
+
+# DEBUGGING
+#all_tables <- c("synergyfinder/data/data_with_replicates.csv") 
+
+for (table in all_tables){
+
+  new_table <- read.csv(paste0(table, ".csv"), stringsAsFactors = F)
+  
+  # get rid of any extra cols and rows from Excel
+  new_table <- new_table[, 1:10]   # we always have 10 columns
+  new_table <- na.omit(new_table)  # delete NA rows
+  
+  new_table2 <- with(new_table, data.frame(Row, Col, ConcRow, ConcCol, Response))
+  
+  mean_table <- aggregate(new_table2, by = list(new_table$Row, new_table$Col), 
+                          mean, na.rm=TRUE)
+  
+  # These cols are all the same, use first entry to fill mean_table
+  mean_table$DrugRow <- new_table$DrugRow[1]
+  mean_table$DrugCol <- new_table$DrugCol[1]
+  mean_table$ConcRowUnit <- new_table$ConcRowUnit[1]
+  mean_table$ConcColUnit <- new_table$ConcColUnit[1]
+  mean_table$BlockID <- 1
+  
+  mat <- ReshapeData(mean_table, data.type = "viability")
+  
+  # Can plot matrix and synergy here
+  #cat(table)
+  #PlotDoseResponse2(mat, cex.axis = 0.6, cex.lab = 0.7)
+  #CalculateSynergySummaryScore(mat, plot = T)
+
+  assign(table, mat)
+
+  library(reshape2)
+  
+  cast_table <- dcast(new_table, Row + Col + ConcRow + ConcCol ~ Replicate, value.var = "Response")
+  
+  cast_table$BlockID <- 1
+  cast_table$DrugRow <- new_table$DrugRow[1]
+  cast_table$DrugCol <- new_table$DrugCol[1]
+  cast_table$ConcRowUnit <- new_table$ConcRowUnit[1]
+  cast_table$ConcColUnit <- new_table$ConcColUnit[1]
+
+  # Store these for significance testing later
+  assign(paste0(table, "_cast_table"), cast_table)
+
+}
+
+```
+
+
+
+# Bayesian Bootstrapping
+
+Using the R package "bayesboot".
+
+Generate several draws from the distributions for every well of every condition given the replicates.
+
+```{r Bootstrapping, warning=F, message=F, eval=T}
+
+# Create "draws" tables that has nRepeats cols and a row for every well
+# Can later use each col as a Response col
+
+for(table in all_tables){
+  x_table <- get(paste0(table, "_cast_table"))
+  x_draws <- data.frame()
+  replicates_cols <- grep("[1-99]", colnames(x_table), value = T)
+  for(j in 1:nrow(x_table)){    # for all wells
+    data <- t(as.matrix(x_table[j ,colnames(x_table) %in% replicates_cols]))
+    draws <- t(bayesboot(data, R = nRepeats, statistic = weighted.mean, na.rm = T))
+    x_draws <- rbind(x_draws, draws)
+  }
+  assign(paste0(table, "_draws"), x_draws)    
+}
+
+save.image(file = dataimagefilename)
+```
+
+For each draw of well values, generate synergy scores.
+
+```{r, synergy, warning=F, message=F, eval=T}
+
+for(table in all_tables){
+  x_table <- get(paste0(table, "_cast_table"))
+  x_draws <- get(paste0(table, "_draws"))
+
+  for(method in methods){
+  
+    scores <- vector()
+
+    for(i in 1:dim(x_draws)[2]){
+    
+      x_table$Response <- x_draws[,i]
+
+      mat <- ReshapeData(x_table, data.type = "viability")
+      
+      s <- CalculateSynergySummaryScore(mat, method = method)
+      
+      scores <- c(scores, s)
+    }
+    
+    assign(paste0(table, "_", method, "_scores"), as.bayesboot(scores))
+  }
+}
+
+save.image(file = dataimagefilename)
+```
+
+# Calculate and plot mean data
+
+Calculate synergy scores from simple mean of replicates for comparison.
+
+Take the mean value of replicates. If no replicates for any condition, take the mean of neighbours. Plot the matrix with missing values shown but impute for synergy calculation.
+
+\newpage
+
+```{r original, warning=F, message=F, results='asis'}
+
+for(table in all_tables){
+  cat("\\newpage ")
+  cat(paste(table, ", synergy of mean of replicates", "\n\n"))
+  x_table <- get(paste0(table, "_cast_table"))
+  replicates_cols <- grep("[1-99]", colnames(x_table), value = T)
+
+  for(method in methods){
+    data <- x_table[ ,colnames(x_table) %in% replicates_cols]
+    x_table$Response <- rowMeans(data, na.rm = T)
+    
+    mat <- ReshapeData(x_table, data.type = "viability")
+    PlotDoseResponse2(mat, cex.axis = 0.6, cex.lab = 0.7)
+    
+    # Replace any NaN with average of those either side, NB assumes 6x6 matrix
+    #x_table$Response <- replaceNaNsinResponse(x_table$Response)
+    #mat <- ReshapeData(x_table, data.type = "viability")
+
+    s <- CalculateSynergySummaryScore(mat, method = method, plot = TRUE)
+    assign(paste0(table, "_", method, "_original_score"), s)
+
+  }
+}
+
+save.image(file = dataimagefilename)
+```
+
+# Synergy score plots
+
+Collate data and plot.
+
+```{r plot, results='asis'}
+
+for(method in methods){
+
+  orig_scores <- vector()
+  mean_scores <- vector()
+  median_scores <- vector()
+  low95_scores <- vector()
+  high95_scores <- vector()
+#  all_scores <- list()
+#  n=1
+  
+  for(table in all_tables){
+    
+    scores <- get(paste0(table, "_", method, "_scores"))
+    orig_scores <- c(orig_scores, get(paste0(table, "_", method, "_original_score")))
+    
+    #s <- summary(scores, na.rm = T)    # does not have na.rm option
+    #mean_scores <- c(mean_scores, s$value[1])
+    #median_scores <- c(median_scores, s$value[7])
+    #low95_scores <- c(low95_scores, s$value[5])
+    #high95_scores <- c(high95_scores, s$value[9])
+    
+    mean_scores <- c(mean_scores, mean(scores$object, na.rm = T))
+    q <- quantile(scores$object, probs = c(0.025, 0.5, 0.975), na.rm = T) # get median and 95% CI
+    median_scores <- c(median_scores, q[2])
+    low95_scores <- c(low95_scores, q[1])
+    high95_scores <- c(high95_scores, q[3])
+  }
+  
+  results_table <- data.frame(all_tables, orig_scores, mean_scores, median_scores, 
+                              low95_scores, high95_scores) 
+  colnames(results_table) <- c("Condition", "Replicate", "Mean", "Median", 
+                               "CI95low", "CI95high")
+  
+  cat("Synergy Scores for replicate means and mean of replicates and ranges.")
+  print(knitr::kable(results_table))
+  
+  p <- ggplot(results_table, aes(x = Condition, y = Mean)) + 
+    geom_point() +
+    geom_errorbar(aes(ymin=CI95low, ymax=CI95high), width=.2, position=position_dodge(.9)) +
+    geom_point(aes(y = Replicate), shape = 4) +
+    theme_minimal()+ 
+    theme(axis.text.x = element_text(angle = 90, vjust = 1, 
+      size = 8, hjust = 1)) +
+    geom_hline(yintercept=0) +
+    geom_hline(yintercept=c(-10,10), linetype="dashed") +
+    ggtitle(method) +
+    ylab(paste(method, "Synergy Score"))
+  
+  print(p)
+  
+  assign(paste0(method, "_results_table"), results_table)
+  
+}
+
+```
+
+
+
+```{r}
+save.image(file = dataimagefilename)
+
+sessionInfo()
+
+```
+
+
+
+
